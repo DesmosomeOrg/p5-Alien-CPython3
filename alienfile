@@ -1,0 +1,56 @@
+use alienfile;
+
+# This currently requires the ability to link to Python for embedding.
+plugin PkgConfig => 'python3-embed';
+
+sub do_source {
+  start_url 'https://www.python.org/downloads/';
+  plugin Download => (
+    filter  => qr/^Python-3\..*\.tar\.xz$/,
+    version => qr/([0-9\.]+)/,
+  );
+  plugin Extract => 'tar.xz';
+  plugin 'Build::Autoconf';
+  build [
+    '%{configure} --enable-static --disable-shared',
+    '%{make}',
+    '%{make} install',
+  ];
+  plugin 'Gather::IsolateDynamic';
+}
+
+sub do_binary_windows {
+  start_url 'https://www.python.org/downloads/windows/';
+  my $arch_name = meta->prop->{platform}{cpu}{arch}{name};
+  my $filter;
+  if( $arch_name eq 'x86' ) {
+    $filter = qr/python-([0-9\.]+)\.exe/;
+  } elsif( $arch_name eq '' ) {
+    $filter = qr/python-([0-9\.]+)-amd64.exe/;
+  } else {
+    die "Unknown architecture for Windows. Please file a bug report.";
+  }
+  plugin Download => (
+    filter  => $filter,
+    version => qr/([0-9\.]+)/,
+  );
+}
+
+sub do_binary_macos {
+  start_url 'https://www.python.org/downloads/macos/';
+  # Using universal2 installer.
+  plugin Download => (
+    filter  => qr/python-([0-9\.]+)-macos11.pkg/,
+    version => qr/([0-9\.]+)/,
+  );
+}
+
+share {
+  if( $^O eq 'MSWin32' ) {
+    do_binary_windows;
+  } elsif( $^O eq 'darwin' ) {
+    do_binary_macos;
+  } else {
+    do_source;
+  }
+}
