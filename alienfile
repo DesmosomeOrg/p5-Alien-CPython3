@@ -1,7 +1,18 @@
 use alienfile;
 
+my $IS_UNIX = $^O ne 'MSWin32';
+
 # This currently requires the ability to link to Python for embedding.
-plugin PkgConfig => 'python3-embed';
+if( $IS_UNIX ) {
+  plugin PkgConfig => 'python3-embed';
+}
+
+plugin 'Probe::CommandLine' => (
+  command   => 'python3',
+  args      => [ '--version' ],
+  version => qr/^Python (3\.[0-9\.]+)$/,
+  secondary => $IS_UNIX,
+);
 
 sub do_source {
   start_url 'https://www.python.org/downloads/';
