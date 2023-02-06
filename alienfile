@@ -20,12 +20,14 @@ sub do_source {
 }
 
 sub do_binary_windows {
+  requires 'Alien::Build::CommandSequence';
+
   start_url 'https://www.python.org/downloads/windows/';
   my $arch_name = meta->prop->{platform}{cpu}{arch}{name};
   my $filter;
   if( $arch_name eq 'x86' ) {
     $filter = qr/python-([0-9\.]+)\.exe/;
-  } elsif( $arch_name eq '' ) {
+  } elsif( $arch_name eq 'x86_64' ) {
     $filter = qr/python-([0-9\.]+)-amd64.exe/;
   } else {
     die "Unknown architecture for Windows. Please file a bug report.";
@@ -34,6 +36,39 @@ sub do_binary_windows {
     filter  => $filter,
     version => qr/([0-9\.]+)/,
   );
+  extract sub {
+    my ($build) = @_;
+
+    my $exe = Path::Tiny::path($build->install_prop->{download})->canonpath;
+    my $cwd = Path::Tiny->cwd->canonpath;
+
+    # https://docs.python.org/3/using/windows.html
+    Alien::Build::CommandSequence->new([
+      $exe, '/quiet',
+      "TargetDir=$cwd",
+      qw(
+      InstallAllUsers=0
+
+      AssociateFiles=0
+      PrependPath=0
+      AppendPath=0
+      Shortcuts=0
+
+      Include_doc=0
+      Include_debug=0
+      Include_dev=1
+      Include_exe=1
+      Include_launcher=0
+      Include_lib=1
+      Include_pip=1
+      Include_symbols=0
+      Include_tcltk=1
+      Include_test=1
+      Include_tools=1
+      SimpleInstall=1
+      ),
+    ])->execute($build);
+  };
 }
 
 sub do_binary_macos {
