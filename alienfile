@@ -80,6 +80,14 @@ sub do_binary_windows {
       ),
     ])->execute($build);
   };
+
+  plugin 'Build::Copy';
+
+  after build => sub {
+    my($build) = @_;
+    $build->runtime_prop->{'style'} = 'binary';
+    #$build->runtime_prop->{command} = 'python3';
+  };
 }
 
 sub do_binary_macos {
