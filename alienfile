@@ -1,5 +1,7 @@
 use alienfile;
 
+use Path::Tiny qw( path );
+
 my $IS_UNIX = $^O ne 'MSWin32';
 
 # This currently requires the ability to link to Python for embedding.
@@ -35,49 +37,136 @@ sub do_binary_windows {
 
   start_url 'https://www.python.org/downloads/windows/';
   my $arch_name = meta->prop->{platform}{cpu}{arch}{name};
-  my $filter;
+  my ($filter, $arch_id);
   if( $arch_name eq 'x86' ) {
     $filter = qr/python-([0-9\.]+)\.exe/;
+    $arch_id = 'win32';
   } elsif( $arch_name eq 'x86_64' ) {
     $filter = qr/python-([0-9\.]+)-amd64.exe/;
+    $arch_id = 'amd64';
   } else {
     die "Unknown architecture for Windows. Please file a bug report.";
   }
-  plugin Download => (
-    filter  => $filter,
-    version => qr/([0-9\.]+)/,
-  );
+  plugin 'Download';
+  plugin 'Decode::Mojo';
+  download sub {
+    my ($build) = @_;
+
+    $build->log( "GET @{[ meta->prop->{start_url} ]}");
+
+    my $version_index_url = do {
+      my $ret = $build->decode( $build->fetch );
+      my($first) = grep { $_->{filename} =~ $filter } @{ $ret->{list} };
+      # from: https://www.python.org/ftp/python/3.11.1/python-3.11.1-amd64.exe
+      #   to: https://www.python.org/ftp/python/3.11.1
+      (my $url = $first->{url}) =~ s,/[^/]+$,,;
+      $url;
+    };
+    my $arch_index_url = "${version_index_url}/${arch_id}/";
+
+    do {
+      my $ret = $build->decode( $build->fetch($arch_index_url) );
+      $build->log(".msi list (all) " . join(" ", map $_->{filename}, @{ $ret->{list} }));
+
+      # filter out debugging .msi's
+      my @filtered_list = grep {
+        $_->{filename} !~ /(_d|_pdb)\.msi$/
+      } @{ $ret->{list} };
+      $build->log(".msi list (filter) " . join(" ", map $_->{filename}, @filtered_list));
+
+      # Need to skip:
+      #
+      # Reason: modify global environment
+      #   - appendpath.msi
+      #   - path.msi
+      #
+      # Reason: extra disk space
+      #   - launcher.msi
+      #   - doc.msi
+      #
+      # Reason: use ensurepip
+      #   - pip.msi
+      my $msi_allow_filter = qr/
+        ^
+        ( tools
+        | dev
+        | ucrt
+        | exe
+        | core
+        | tcltk
+        | test
+        | lib
+        )
+        \.msi
+        $
+      /x;
+
+      my @downloads = grep { $_->{filename} =~ $msi_allow_filter } @filtered_list;
+
+      for my $download (@downloads) {
+        my $url = $download->{url};
+        $build->log("GET $url");
+
+        {
+          my $ret = $build->fetch($url);
+
+          if(defined $ret->{content})
+          {
+            path($ret->{filename})->spew_raw($ret->{content});
+          }
+          elsif(defined $ret->{path})
+          {
+            my $from = path($ret->{path});
+            my $to   = $ret->{filename};
+            if($ret->{tmp})
+            {
+              $from->move($to);
+            }
+            else
+            {
+              $from->copy($to);
+            }
+          }
+          else
+          {
+            die 'get did not return a file';
+          }
+        };
+      }
+    };
+  };
+
+
+  #plugin Download => (
+  #  filter  => $filter,
+  #  version => qr/([0-9\.]+)/,
+  #);
   extract sub {
     my ($build) = @_;
 
-    my $exe = Path::Tiny::path($build->install_prop->{download})->canonpath;
+    my @msis = Path::Tiny::path($build->install_prop->{download})->absolute->children( qr/\.msi$/ );
     my $cwd = Path::Tiny->cwd->canonpath;
 
-    # https://docs.python.org/3/using/windows.html
+    for my $msi (@msis) {
+      Alien::Build::CommandSequence->new([
+        qw(msiexec /a),
+        $msi->canonpath,
+        "TARGETDIR=$cwd",
+        '/qn'
+      ])->execute($build);
+      my $cwd_msi = Path::Tiny->cwd->child( $msi->basename );
+      if( -f $cwd_msi ) {
+        $build->log( "Removing @{[ $msi->basename ]}");
+        $cwd_msi->remove;
+      }
+    }
+  };
+
+  before build => sub {
+    my($build) = @_;
+
     Alien::Build::CommandSequence->new([
-      $exe, '/quiet',
-      "TargetDir=$cwd",
-      qw(
-      InstallAllUsers=0
-
-      AssociateFiles=0
-      PrependPath=0
-      AppendPath=0
-      Shortcuts=0
-
-      Include_doc=0
-      Include_debug=0
-      Include_dev=1
-      Include_exe=1
-      Include_launcher=0
-      Include_lib=1
-      Include_pip=1
-      Include_symbols=0
-      Include_tcltk=1
-      Include_test=1
-      Include_tools=1
-      SimpleInstall=1
-      ),
+      qw(python -m ensurepip --default-pip),
     ])->execute($build);
   };
 
@@ -86,7 +175,7 @@ sub do_binary_windows {
   after build => sub {
     my($build) = @_;
     $build->runtime_prop->{'style'} = 'binary';
-    #$build->runtime_prop->{command} = 'python3';
+    $build->runtime_prop->{command} = 'python';
   };
 }
 
