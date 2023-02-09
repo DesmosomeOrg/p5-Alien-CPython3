@@ -77,6 +77,9 @@ sub do_binary_windows {
     };
     my $arch_index_url = "${version_index_url}/${arch_id}/";
 
+    my ($version) = $version_index_url =~ m,/([0-9\.]+)$,;
+    $build->runtime_prop->{version} = $version;
+
     do {
       my $ret = $build->decode( $build->fetch($arch_index_url) );
       $build->log(".msi list (all) " . join(" ", map $_->{filename}, @{ $ret->{list} }));
@@ -150,10 +153,6 @@ sub do_binary_windows {
   };
 
 
-  #plugin Download => (
-  #  filter  => $filter,
-  #  version => qr/([0-9\.]+)/,
-  #);
   extract sub {
     my ($build) = @_;
 
