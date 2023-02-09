@@ -5,6 +5,11 @@ use warnings;
 use base qw( Alien::Base );
 use 5.008004;
 
+sub exe {
+  my($class) = @_;
+  $class->runtime_prop->{command};
+}
+
 1;
 
 =head1 NAME
