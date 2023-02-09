@@ -6,6 +6,7 @@ use IPC::Cmd ();
 use File::Spec ();
 use File::Find;
 use File::Which qw(which);
+use Sort::Versions qw(versioncmp);
 
 my $IS_UNIX = $^O ne 'MSWin32';
 
@@ -69,7 +70,9 @@ sub do_binary_windows {
 
     my $version_index_url = do {
       my $ret = $build->decode( $build->fetch );
-      my($first) = grep { $_->{filename} =~ $filter } @{ $ret->{list} };
+      my ($first) =
+        sort { my @v = map { ($_ =~ $filter)[0] } $a, $b; versioncmp($v[0], $v[1]) }
+        grep { $_->{filename} =~ $filter } @{ $ret->{list} };
       # from: https://www.python.org/ftp/python/3.11.1/python-3.11.1-amd64.exe
       #   to: https://www.python.org/ftp/python/3.11.1
       (my $url = $first->{url}) =~ s,/[^/]+$,,;
