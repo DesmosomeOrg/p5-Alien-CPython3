@@ -340,9 +340,7 @@ sub do_binary_macos {
     File::Copy::Recursive::rmove( "$framework_src_dir/Payload/*", $framework_dst_dir );
     $framework_src_dir->remove_tree( { safe => 0 } );
 
-    macos_relocatable_python($build, $framework_dst_dir);
-
-    my ($version_base) = $framework_dst_dir->child( qw(Python.framework Versions) )->children( qr/^3\./ );
+    macos_relocatable_python($build, $framework_dst_dir->parent);
   };
 
   plugin 'Build::Copy';
@@ -356,7 +354,7 @@ sub do_binary_macos {
     $build->runtime_prop->{command} = 'python';
 
     my $framework_dst_dir = path('Python.framework');
-    my ($version_base) = $framework_dst_dir->child( qw(Python.framework Versions) )->children( qr/^3\./ );
+    my ($version_base) = $framework_dst_dir->child( qw(Versions) )->children( qr/^3\./ );
     $build->runtime_prop->{share_bin_dir} = $version_base->child('bin')->absolute($prefix);
   };
 }
