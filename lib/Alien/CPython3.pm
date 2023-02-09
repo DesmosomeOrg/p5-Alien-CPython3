@@ -5,6 +5,8 @@ use warnings;
 use base qw( Alien::Base );
 use 5.008004;
 
+use Path::Tiny qw(path);
+
 sub exe {
   my($class) = @_;
   $class->runtime_prop->{command};
@@ -12,9 +14,11 @@ sub exe {
 
 sub bin_dir {
 	my $class = shift;
-  if($class->install_type('share') && defined $class->runtime_prop->{share_bin_dir}) {
+  if($class->install_type('share') && defined $class->runtime_prop->{share_bin_dir_rel}) {
 		my $prop = $class->runtime_prop;
-		return ref $prop->{share_bin_dir} ? @{ $prop->{share_bin_dir} } : ($prop->{share_bin_dir});
+		return
+			map { path($_)->absolute($class->dist_dir)->stringify }
+			ref $prop->{share_bin_dir_rel} ? @{ $prop->{share_bin_dir_rel} } : ($prop->{share_bin_dir_rel});
 	} else {
 		return $class->SUPER::bin_dir(@_);
 	}
