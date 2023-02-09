@@ -10,6 +10,16 @@ sub exe {
   $class->runtime_prop->{command};
 }
 
+sub bin_dir {
+	my $class = shift;
+  if($class->install_type('share') && defined $class->runtime_prop->{share_bin_dir}) {
+		my $prop = $class->runtime_prop;
+		return ref $prop->{share_bin_dir} ? @{ $prop->{share_bin_dir} } : ($prop->{share_bin_dir});
+	} else {
+		return $class->SUPER::bin_dir(@_);
+	}
+}
+
 1;
 
 =head1 NAME
