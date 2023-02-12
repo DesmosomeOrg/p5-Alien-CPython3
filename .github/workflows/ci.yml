@@ -132,6 +132,11 @@ jobs:
         run: |
           cpanm --notest --installdeps .
 
+      - name: Dynamic share deps
+        if: matrix.alien-install-type == 'share'
+        run: |
+          cpanm --notest Net::SSLeay IO::Socket::SSL
+
       - name: Set ALIEN_INSTALL_TYPE
         shell: bash
         run: |
