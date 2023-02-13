@@ -15,6 +15,7 @@ if( $IS_UNIX ) {
   #plugin PkgConfig => 'python3-embed';
 }
 
+my $probe = 0;
 for my $command (qw(python3 python)) {
   next unless which($command);
   plugin 'Probe::CommandLine' => (
@@ -23,6 +24,11 @@ for my $command (qw(python3 python)) {
     version => qr/^Python (3\.[0-9\.]+)$/,
     #secondary => $IS_UNIX,
   );
+  $probe = 1;
+}
+
+unless( $probe ) {
+  probe sub { 'share' };
 }
 
 sub do_source {
